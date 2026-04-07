@@ -85,7 +85,7 @@ impl<'a, D: HasDisplayHandle, W: HasWindowHandle> Graphics<'a, D, W> {
     pub fn draw_rect(&mut self, x: u32, y: u32, w: u32, h: u32, color: Color) {
         let cols: Vec<u32> = vec![color.into(); w as usize];
 
-        for i in y..h {
+        for i in y..y + h {
             let idx = self.get_idx(x, i);
             self.buf[idx..idx + w as usize].copy_from_slice(&cols);
         }
@@ -140,17 +140,19 @@ impl<'a, D: HasDisplayHandle, W: HasWindowHandle> Graphics<'a, D, W> {
         }
     }
 
-    // Draws a horizontal line between x0 and x1 and y
+    // Draws a horizontal line at y between x0 and x1
     fn draw_line_horizontal(&mut self, x0: i32, x1: i32, y: i32, color: Color) {
-        if x0 < x1 {
-            for x in x0..x1+1 {
-                self.set_pixel(x, y, color);
-            }
+        let xmin = x0.min(x1);
+        let xmax = x0.max(x1)+1;
+
+        if self.in_bounds(xmin, y) && self.in_bounds(xmax, y) {
+            self.draw_rect(xmin as u32, y as u32, (xmax - xmin) as u32, 1, color);
         }
-        else {
-            for x in x1..x0+1 {
-                self.set_pixel(x, y, color);
-            }
+        else if self.in_bounds(xmin, y) {
+            self.draw_rect(xmin as u32, y as u32, self.width() - xmin as u32, 1, color);
+        }
+        else if self.in_bounds(xmax, y) {
+            self.draw_rect(0, y as u32, xmax as u32, 1, color);
         }
     }
 
@@ -271,24 +273,36 @@ impl<'a, D: HasDisplayHandle, W: HasWindowHandle> Graphics<'a, D, W> {
     }
 
     fn get_point_from_clip(&self, clip: Vec4) -> Point {
-        let ndc = clip.xyz() / clip.w;
+        let ndc = clip.xyz();
 
-        let screen_x = ((ndc.x + 1.) * 0.5 * self.width() as f32) as i32;
-        let screen_y = ((ndc.y + 1.) * 0.5 * self.height() as f32) as i32;
+        let screen_x = ((ndc.x + 1.) * 0.5 * (self.width() - 1) as f32) as i32;
+        let screen_y = ((-ndc.y + 1.) * 0.5 * (self.height() - 1) as f32) as i32;
 
         Point { x: screen_x, y: screen_y}
     }
 
     // Draws a triangle whose vertices are in clip space [-1, 1]
-    pub fn draw_triangle_clip(&mut self, verts: &[Vec4; 3], color: Color) {
+    pub fn draw_triangle_clip(&mut self, verts: &[Vec4; 3], color: Color, draw_mode: DrawMode) {
         let points = [
             self.get_point_from_clip(verts[0]),
             self.get_point_from_clip(verts[1]),
             self.get_point_from_clip(verts[2])
         ];
 
-        self.draw_triangle_direct(&points, color);
+        match draw_mode {
+            DrawMode::Fill => self.draw_triangle_direct(&points, color),
+            DrawMode::Outline => {
+                self.draw_line(points[0], points[1], color);
+                self.draw_line(points[0], points[2], color);
+                self.draw_line(points[1], points[2], color);
+            }
+        }
     }
+}
+
+pub enum DrawMode {
+    Fill,
+    Outline
 }
 
 #[derive(Clone, Copy, Debug)]

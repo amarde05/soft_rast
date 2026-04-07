@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
-use glam::Vec3;
+use glam::{Mat4, Vec3, Vec4};
 use softbuffer::Context;
 use winit::{application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{EventLoop, OwnedDisplayHandle}, keyboard::KeyCode, window::Window};
 
 use anyhow::Result;
 
-use crate::{render::{Renderer, camera::Camera}, engine::{input::Input, time::Time}};
+use crate::{engine::{input::Input, mesh::{Mesh, MeshRegistry}, time::Time}, render::{Renderer, camera::Camera}};
 
 mod render;
 mod engine;
+mod res;
 
 fn main() -> Result<()> {
     let event_loop = EventLoop::with_user_event().build()?;
@@ -25,7 +26,8 @@ struct State {
     renderer: Renderer<OwnedDisplayHandle, Arc<Window>>,
     camera: Camera,
     input: Input,
-    time: Time
+    time: Time,
+    mesh_registry: MeshRegistry
 }
 
 impl State {
@@ -40,12 +42,17 @@ impl State {
 
         let input = Input::new();
 
+
+        let mut mesh_registry = MeshRegistry::new();
+        mesh_registry.register_mesh(res::load_mesh("../res/teapot.obj"));
+
         Self {
             window: window.clone(),
             renderer,
             camera,
             input,
-            time: Time::new()
+            time: Time::new(),
+            mesh_registry
         }
     }
 
@@ -55,7 +62,53 @@ impl State {
     }
 
     fn render(&mut self) {
-        self.renderer.render(&self.camera);
+        self.camera.clean();
+        self.renderer.render(&self.camera, &self.mesh_registry);
+    }
+
+    fn update(&mut self) {
+        let dt = self.time.tick();
+
+        if self.input.get_key(KeyCode::KeyW) {
+            self.camera.move_in_dir(self.camera.forward(), 2. * dt);
+        }
+        
+        if self.input.get_key(KeyCode::KeyS) {
+            self.camera.move_in_dir(-self.camera.forward(), 2. * dt);
+        }
+
+        if self.input.get_key(KeyCode::KeyA) {
+            self.camera.move_in_dir(-self.camera.right(), 2. * dt);
+        }
+        
+        if self.input.get_key(KeyCode::KeyD) {
+            self.camera.move_in_dir(self.camera.right(), 2. * dt);
+        }
+
+        if self.input.get_key(KeyCode::Space) {
+            self.camera.move_in_dir(self.camera.up(), 2. * dt);
+        }
+        
+        if self.input.get_key(KeyCode::ControlLeft) {
+            self.camera.move_in_dir(-self.camera.up(), 2. * dt);
+        }
+
+        if self.input.get_key(KeyCode::KeyQ) {
+            self.camera.rotate(Vec3::new(0., 2., 0.) * dt);
+        }
+        
+        if self.input.get_key(KeyCode::KeyE) {
+            self.camera.rotate(Vec3::new(0., -2., 0.) * dt);
+        }
+
+        self.renderer.add_render_object(render::RenderObject {
+            mesh_id: 0,
+            model_matrix: Mat4::IDENTITY
+        });
+
+        self.input.end_update();
+
+        self.window.request_redraw();
     }
 }
 
@@ -109,46 +162,7 @@ impl ApplicationHandler<State> for App {
 
     fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         match &mut self.state {
-            Some(state) => {
-                // Update loop
-                let dt = state.time.tick();
-
-                if state.input.get_key(KeyCode::KeyW) {
-                    state.camera.translate(Vec3::new(0., 0., -2.) * dt);
-                }
-                
-                if state.input.get_key(KeyCode::KeyS) {
-                    state.camera.translate(Vec3::new(0., 0., 2.) * dt);
-                }
-
-                if state.input.get_key(KeyCode::KeyA) {
-                    state.camera.translate(Vec3::new(-2., 0., 0.) * dt);
-                }
-                
-                if state.input.get_key(KeyCode::KeyD) {
-                    state.camera.translate(Vec3::new(2., 0., 0.) * dt);
-                }
-
-                if state.input.get_key(KeyCode::Space) {
-                    state.camera.translate(Vec3::new(0., 2., 0.) * dt);
-                }
-                
-                if state.input.get_key(KeyCode::ControlLeft) {
-                    state.camera.translate(Vec3::new(0., -2., 0.) * dt);
-                }
-
-                if state.input.get_key(KeyCode::KeyQ) {
-                    state.camera.rotate(Vec3::new(0., 2., 0.) * dt);
-                }
-                
-                if state.input.get_key(KeyCode::KeyE) {
-                    state.camera.rotate(Vec3::new(0., -2., 0.) * dt);
-                }
-
-                state.input.end_update();
-
-                state.window.request_redraw();
-            },
+            Some(state) => state.update(),
             _ => {}
         }
     }
