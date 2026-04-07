@@ -4,11 +4,10 @@ use glam::Vec4;
 use softbuffer::{Context, Surface};
 use winit::{dpi::PhysicalSize, raw_window_handle::{HasDisplayHandle, HasWindowHandle}};
 
-use crate::render::graphics::{Color, Graphics, Point};
-
-use crate::camera::Camera;
+use crate::render::{graphics::{Color, Graphics, Point}, camera::Camera};
 
 mod graphics;
+pub(crate) mod camera;
 
 pub struct Renderer<D, W> {
     surface: Surface<D, W>,

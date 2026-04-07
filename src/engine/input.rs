@@ -32,13 +32,7 @@ impl Input {
 
         match event.physical_key {
             PhysicalKey::Code(code) => {
-                let mut info = match self.key_map.get_mut(&code) {
-                    Some(info) => info,
-                    None => {
-                        self.key_map.insert(code, KeyInfo::new());
-                        self.key_map.get_mut(&code).unwrap()
-                    }
-                };
+                let info = self.key_map.entry(code).or_insert_with(|| KeyInfo::new());
             
                 match event.state {
                     ElementState::Pressed => {

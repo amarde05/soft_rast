@@ -6,12 +6,10 @@ use winit::{application::ApplicationHandler, dpi::PhysicalSize, event::WindowEve
 
 use anyhow::Result;
 
-use crate::{camera::Camera, input::Input, render::Renderer, time::Time};
+use crate::{render::{Renderer, camera::Camera}, engine::{input::Input, time::Time}};
 
 mod render;
-mod input;
-mod camera;
-mod time;
+mod engine;
 
 fn main() -> Result<()> {
     let event_loop = EventLoop::with_user_event().build()?;
