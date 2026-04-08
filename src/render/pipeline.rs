@@ -53,7 +53,7 @@ impl Pipeline {
 
     fn is_backface(&self, triangle: &Triangle) -> bool {
         let normal = triangle.get_normal();
-        normal.dot(triangle.verts[0].xyz()) < 0.
+        normal.dot(triangle.verts[0].xyz()) >= 0.
     }
 
     fn clip(&self, input: &Vec<Triangle>, output: &mut Vec<Triangle>) {

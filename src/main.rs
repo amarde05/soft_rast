@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{f32::consts::PI, sync::Arc};
 
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Quat, Vec2, Vec3, Vec4};
 use softbuffer::Context;
-use winit::{application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{EventLoop, OwnedDisplayHandle}, keyboard::KeyCode, window::Window};
+use winit::{application::ApplicationHandler, dpi::PhysicalSize, event::{DeviceEvent, WindowEvent}, event_loop::{EventLoop, OwnedDisplayHandle}, keyboard::KeyCode, window::Window};
 
 use anyhow::Result;
 
@@ -27,7 +27,8 @@ struct State {
     camera: Camera,
     input: Input,
     time: Time,
-    mesh_registry: MeshRegistry
+    mesh_registry: MeshRegistry,
+    mesh_rot: Vec3,
 }
 
 impl State {
@@ -42,9 +43,9 @@ impl State {
 
         let input = Input::new();
 
-
         let mut mesh_registry = MeshRegistry::new();
-        mesh_registry.register_mesh(res::load_mesh("../res/teapot.obj"));
+        mesh_registry.register_mesh(res::load_mesh("teapot.obj"));
+        mesh_registry.register_mesh(res::load_mesh("monkey.obj"));
 
         Self {
             window: window.clone(),
@@ -52,8 +53,19 @@ impl State {
             camera,
             input,
             time: Time::new(),
-            mesh_registry
+            mesh_registry,
+            mesh_rot: Vec3::ZERO
         }
+    }
+
+    fn lock_cursor(&self) {
+        self.window.set_cursor_visible(false);
+        self.window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
+    }
+
+    fn unlock_cursor(&self) {
+        self.window.set_cursor_visible(true);
+        self.window.set_cursor_grab(winit::window::CursorGrabMode::None).unwrap();
     }
 
     fn resize(&mut self, size: PhysicalSize<u32>) {
@@ -66,8 +78,20 @@ impl State {
         self.renderer.render(&self.camera, &self.mesh_registry);
     }
 
+    fn init(&mut self) {
+        self.lock_cursor();
+    }
+
     fn update(&mut self) {
         let dt = self.time.tick();
+
+        if self.input.get_key_down(KeyCode::Escape) {
+            self.unlock_cursor();
+        }
+
+        if self.input.get_mouse_button_down(winit::event::MouseButton::Left) {
+            self.lock_cursor();
+        }
 
         if self.input.get_key(KeyCode::KeyW) {
             self.camera.move_in_dir(self.camera.forward(), 2. * dt);
@@ -93,17 +117,19 @@ impl State {
             self.camera.move_in_dir(-self.camera.up(), 2. * dt);
         }
 
-        if self.input.get_key(KeyCode::KeyQ) {
-            self.camera.rotate(Vec3::new(0., 2., 0.) * dt);
-        }
-        
-        if self.input.get_key(KeyCode::KeyE) {
-            self.camera.rotate(Vec3::new(0., -2., 0.) * dt);
+        let delta = self.input.get_mouse_delta();
+        if delta != Vec2::ZERO {
+            self.camera.rotate(Vec3::new(-delta.y, -delta.x, 0.) * 15. * dt);
         }
 
+        self.mesh_rot += Vec3::new(180. * dt, 180. * dt, 180. * dt) * PI / 180. * 0.;
+
         self.renderer.add_render_object(render::RenderObject {
-            mesh_id: 0,
-            model_matrix: Mat4::IDENTITY
+            mesh_id: 1,
+            model_matrix: Mat4::from_rotation_translation(
+                Quat::from_euler(glam::EulerRot::XYZ, self.mesh_rot.x, self.mesh_rot.y, self.mesh_rot.z),
+                Vec3::new(0., 0., -5.)
+            )
         });
 
         self.input.end_update();
@@ -133,7 +159,9 @@ impl ApplicationHandler<State> for App {
         let context = softbuffer::Context::new(event_loop.owned_display_handle()).unwrap();        
         let window = Arc::new(event_loop.create_window(Window::default_attributes()).unwrap());
 
-        self.state = Some(State::new(&context, window));
+        let mut state = State::new(&context, window);
+        state.init();
+        self.state = Some(state);
     }
 
     fn window_event(
@@ -151,13 +179,36 @@ impl ApplicationHandler<State> for App {
             return;
         }
 
+        let input = &mut state.input;
+
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => state.resize(size),
             WindowEvent::RedrawRequested => state.render(),
-            WindowEvent::KeyboardInput { event, .. } => state.input.handle_key_event(event),
+            WindowEvent::KeyboardInput { event, .. } => input.handle_key_event(event),
+            WindowEvent::MouseInput { state, button, .. } => input.handle_mouse_event(state, button),
             _ => {}
         }
+    }
+
+    fn device_event(
+            &mut self,
+            event_loop: &winit::event_loop::ActiveEventLoop,
+            device_id: winit::event::DeviceId,
+            event: winit::event::DeviceEvent,
+        ) {
+        let state = match &mut self.state {
+            Some(st) => st,
+            None => return,
+        };
+
+        let input = &mut state.input;
+
+        match event {
+            DeviceEvent::MouseMotion { delta } => input.handle_cursor_delta(delta),
+            _ => {}
+        }
+
     }
 
     fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {

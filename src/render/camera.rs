@@ -72,7 +72,7 @@ impl Camera {
     }
 
     pub fn set_rotation(&mut self, rot: Vec3) {
-        self.rotation = Camera::euler_to_quat(rot);
+        self.rotation = Camera::euler_to_quat(rot * PI / 180.);
         self.set_dirty();
     }
 
@@ -81,7 +81,7 @@ impl Camera {
     }
 
     pub fn rotate(&mut self, amount: Vec3) {
-        self.rotation *= Camera::euler_to_quat(amount);
+        self.rotation *= Camera::euler_to_quat(amount * PI / 180.);
         self.set_dirty();
     }
 

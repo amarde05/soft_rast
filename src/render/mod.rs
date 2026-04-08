@@ -73,8 +73,8 @@ impl Triangle {
     }
 
     pub fn get_normal(&self) -> Vec3 {
-        let edge1 = (self.verts[1] - self.verts[0]).xyz();
-        let edge2 = (self.verts[2] - self.verts[0]).xyz();
+        let edge1 = (self.verts[2] - self.verts[0]).xyz();
+        let edge2 = (self.verts[1] - self.verts[0]).xyz();
         edge1.cross(edge2)
     }
 }
